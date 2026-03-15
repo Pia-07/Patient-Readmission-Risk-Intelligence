@@ -68,14 +68,6 @@ TIPS:
 - For risk level breakdown (Low/Medium/High counts), use gold_risk_distribution.
 """
 
-TIPS:
-- For a quick hospital overview, query gold_hospital_kpis (single row).
-- For risk + demographics together, use gold_patient_risk_summary.
-- For risk level breakdown (Low/Medium/High counts), use gold_risk_distribution.
-- For detailed patient info, JOIN patients with model_predictions on patient_id.
-- For visit details, JOIN patient_visits with patients on patient_id.
-"""
-
 SQL_GENERATION_PROMPT = """You are a DuckDB SQL expert for a hospital readmission risk analytics platform.
 
 {schema}
