@@ -1,0 +1,192 @@
+/* ========================================
+   KenexAI Healthcare Dashboard — Custom CSS
+   Color Palette: White + Blue + Green
+   ======================================== */
+
+/* --- Global Styles --- */
+[data-testid="stAppViewContainer"] {
+    background: linear-gradient(135deg, #f0f4f8 0%, #e8f4f8 50%, #f0f8f0 100%);
+}
+
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #1a365d 0%, #2d4a7a 100%);
+}
+
+[data-testid="stSidebar"] * {
+    color: #e2e8f0 !important;
+}
+
+[data-testid="stSidebar"] .stSelectbox label,
+[data-testid="stSidebar"] .stMultiSelect label {
+    color: #a0d2db !important;
+    font-weight: 600;
+}
+
+/* --- Headers --- */
+h1 {
+    color: #1a365d !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.5px;
+    border-bottom: 3px solid #38b2ac;
+    padding-bottom: 10px;
+}
+
+h2 {
+    color: #2d4a7a !important;
+    font-weight: 600 !important;
+}
+
+h3 {
+    color: #2c5282 !important;
+}
+
+/* --- Metric Cards --- */
+[data-testid="stMetric"] {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 2px 12px rgba(26, 54, 93, 0.08);
+    border-left: 4px solid #38b2ac;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-testid="stMetric"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(26, 54, 93, 0.15);
+}
+
+[data-testid="stMetricLabel"] {
+    color: #4a5568 !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+[data-testid="stMetricValue"] {
+    color: #1a365d !important;
+    font-weight: 700 !important;
+    font-size: 1.8rem !important;
+}
+
+/* --- Buttons --- */
+.stButton > button {
+    background: linear-gradient(135deg, #2d4a7a 0%, #38b2ac 100%);
+    color: white !important;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 24px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(56, 178, 172, 0.3);
+}
+
+.stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(56, 178, 172, 0.4);
+}
+
+/* --- DataFrames --- */
+[data-testid="stDataFrame"] {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(26, 54, 93, 0.08);
+}
+
+/* --- Form Container --- */
+[data-testid="stForm"] {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(26, 54, 93, 0.08);
+    border: 1px solid #e2e8f0;
+}
+
+/* --- Expanders --- */
+.streamlit-expanderHeader {
+    background: #f7fafc !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    color: #2d4a7a !important;
+}
+
+/* --- Tabs --- */
+.stTabs [data-baseweb="tab"] {
+    font-weight: 600;
+    color: #4a5568;
+}
+
+.stTabs [aria-selected="true"] {
+    color: #2d4a7a !important;
+    border-bottom-color: #38b2ac !important;
+}
+
+/* --- Risk Level Badges --- */
+.risk-high {
+    background: linear-gradient(135deg, #fc8181, #f56565);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.risk-medium {
+    background: linear-gradient(135deg, #f6e05e, #ecc94b);
+    color: #744210;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.risk-low {
+    background: linear-gradient(135deg, #68d391, #48bb78);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* --- Alert Cards --- */
+.alert-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border-left: 4px solid #f56565;
+    transition: transform 0.2s ease;
+}
+
+.alert-card:hover {
+    transform: translateX(4px);
+}
+
+/* --- Gauge Container --- */
+.gauge-container {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(26, 54, 93, 0.1);
+}
+
+/* --- Info Cards --- */
+.info-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(26, 54, 93, 0.08);
+    border-top: 4px solid #38b2ac;
+}
+
+/* --- Footer --- */
+.footer {
+    text-align: center;
+    color: #a0aec0;
+    font-size: 0.8rem;
+    padding: 20px;
+    margin-top: 40px;
+}

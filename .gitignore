@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Data and Models
+data/*.duckdb
+data/*.csv
+data/raw/*.csv
+data/processed/*.csv
+diabetic_data.csv
+models/*.pkl
+
+# Logs and OS
+*.log
+.DS_Store
+.idea/
+.vscode/
+.gemini/
