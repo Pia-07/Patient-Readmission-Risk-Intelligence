@@ -72,8 +72,8 @@ def load_age_risk():
     try:
         con = get_db()
         df = con.execute("""
-            SELECT p.age, mp.risk_score
-            FROM patients p JOIN model_predictions mp ON p.patient_id = mp.patient_id
+            SELECT age, risk_score
+            FROM gold_patient_risk_summary
             LIMIT 2000
         """).fetchdf()
         con.close()
@@ -88,9 +88,8 @@ def load_visits_trend():
         con = get_db()
         df = con.execute("""
             SELECT age_group, COUNT(*) as patient_count,
-                   AVG(mp.risk_score) as avg_risk
-            FROM patients p
-            JOIN model_predictions mp ON p.patient_id = mp.patient_id
+                   AVG(risk_score) as avg_risk
+            FROM gold_patient_risk_summary
             GROUP BY age_group ORDER BY age_group
         """).fetchdf()
         con.close()

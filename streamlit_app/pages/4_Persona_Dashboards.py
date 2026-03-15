@@ -32,8 +32,9 @@ def load_patients():
         if gold_count > 0:
             df = con.execute("""
                 SELECT patient_id, age, age_group, gender, race,
-                       diag_1_category, num_medications, time_in_hospital,
-                       total_visits, number_inpatient,
+                       diag_1_category, num_medications, num_lab_procedures, 
+                       time_in_hospital, total_visits, number_inpatient,
+                       insulin, diabetes_med, a1c_result,
                        risk_score, risk_percentage, risk_level,
                        0 as number_diagnoses
                 FROM gold_patient_risk_summary
@@ -68,9 +69,13 @@ def _sample_data():
         'gender': np.random.choice(['Male', 'Female'], n),
         'race': np.random.choice(['Caucasian','AfricanAmerican','Hispanic','Asian','Other'], n),
         'num_medications': np.random.randint(1, 30, n),
+        'num_lab_procedures': np.random.randint(10, 100, n),
         'time_in_hospital': np.random.randint(1, 14, n),
         'number_diagnoses': np.random.randint(1, 15, n),
         'diag_1_category': np.random.choice(['Circulatory','Respiratory','Diabetes','Other'], n),
+        'insulin': np.random.choice(['No', 'Up', 'Down', 'Steady'], n),
+        'diabetes_med': np.random.choice(['Yes', 'No'], n),
+        'a1c_result': np.random.choice(['None', 'Norm', '>7', '>8'], n),
         'risk_score': np.random.uniform(0, 1, n),
         'risk_percentage': np.random.uniform(0, 100, n),
         'risk_level': np.random.choice(['Low','Medium','High'], n),
@@ -105,8 +110,9 @@ if "Doctor" in persona:
     c3.metric("Max Risk Score", f"{high_risk['risk_score'].max():.2f}" if len(high_risk) > 0 else "N/A")
 
     st.dataframe(
-        high_risk[['patient_id', 'age', 'gender', 'risk_score', 'risk_level',
-                   'total_visits', 'num_medications', 'diag_1_category']].head(20),
+        high_risk[['risk_level', 'risk_score', 'age', 'gender', 
+                   'diag_1_category', 'num_medications', 'insulin', 
+                   'diabetes_med', 'a1c_result', 'num_lab_procedures']].head(20),
         use_container_width=True
     )
 
@@ -119,7 +125,7 @@ if "Doctor" in persona:
         col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"""
-            **Patient #{selected_id}** | Age: {patient['age']} | Gender: {patient['gender']}
+            **Patient Details** | Age: {patient['age']} | Gender: {patient['gender']}
             - Risk Score: **{patient['risk_score']:.2f}** ({patient['risk_level']})
             - Medications: {patient['num_medications']}
             - Previous Visits: {patient.get('total_visits', 'N/A')}

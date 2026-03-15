@@ -82,17 +82,27 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS dim_patient (
             patient_id INTEGER PRIMARY KEY,
             age INTEGER,
-            gender VARCHAR
+            age_group VARCHAR,
+            gender VARCHAR,
+            race VARCHAR
         )
     """)
 
     con.execute("""
         CREATE TABLE IF NOT EXISTS dim_visit_metrics (
             visit_id INTEGER PRIMARY KEY,
-            num_medications INTEGER,
+            time_in_hospital INTEGER,
             num_lab_procedures INTEGER,
+            num_procedures INTEGER,
+            num_medications INTEGER,
+            total_visits INTEGER,
             number_inpatient INTEGER,
-            time_in_hospital INTEGER
+            number_outpatient INTEGER,
+            number_emergency INTEGER,
+            diag_1_category VARCHAR,
+            insulin VARCHAR,
+            diabetes_med VARCHAR,
+            a1c_result VARCHAR
         )
     """)
 
@@ -103,7 +113,8 @@ def create_tables():
             visit_id INTEGER,
             timestamp VARCHAR,
             risk_score DOUBLE,
-            risk_level VARCHAR
+            risk_level VARCHAR,
+            readmitted_binary INTEGER
         )
     """)
 
@@ -170,28 +181,23 @@ def create_tables():
     con.execute("""
         CREATE TABLE IF NOT EXISTS silver_patient_visits (
             patient_id INTEGER,
-            age_numeric INTEGER,
+            visit_id INTEGER,
+            age INTEGER,
             age_group VARCHAR,
             gender VARCHAR,
             race VARCHAR,
-            num_medications INTEGER,
+            time_in_hospital INTEGER,
             num_lab_procedures INTEGER,
             num_procedures INTEGER,
+            num_medications INTEGER,
+            total_visits INTEGER,
             number_inpatient INTEGER,
             number_outpatient INTEGER,
             number_emergency INTEGER,
-            time_in_hospital INTEGER,
-            number_diagnoses INTEGER,
             diag_1_category VARCHAR,
-            diag_2_category VARCHAR,
-            diag_3_category VARCHAR,
-            diabetes_med VARCHAR,
             insulin VARCHAR,
+            diabetes_med VARCHAR,
             a1c_result VARCHAR,
-            total_visits INTEGER,
-            medication_change INTEGER,
-            high_lab_procedures INTEGER,
-            total_medications_active INTEGER,
             readmitted_binary INTEGER,
             processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -207,9 +213,13 @@ def create_tables():
             race VARCHAR,
             diag_1_category VARCHAR,
             num_medications INTEGER,
+            num_lab_procedures INTEGER,
             time_in_hospital INTEGER,
             total_visits INTEGER,
             number_inpatient INTEGER,
+            insulin VARCHAR,
+            diabetes_med VARCHAR,
+            a1c_result VARCHAR,
             risk_score DOUBLE,
             risk_percentage DOUBLE,
             risk_level VARCHAR,
@@ -257,8 +267,8 @@ def populate_dimensions():
         # dim_patient — from silver_patient_visits
         con.execute("DELETE FROM dim_patient")
         con.execute("""
-            INSERT INTO dim_patient (patient_id, age, gender)
-            SELECT DISTINCT patient_id, age_numeric, gender
+            INSERT INTO dim_patient (patient_id, age, age_group, gender, race)
+            SELECT DISTINCT patient_id, age, age_group, gender, race
             FROM silver_patient_visits
         """)
         dim_p = con.execute("SELECT COUNT(*) FROM dim_patient").fetchone()[0]
@@ -266,8 +276,15 @@ def populate_dimensions():
         # dim_visit_metrics — from silver_patient_visits
         con.execute("DELETE FROM dim_visit_metrics")
         con.execute("""
-            INSERT INTO dim_visit_metrics (visit_id, num_medications, num_lab_procedures, number_inpatient, time_in_hospital)
-            SELECT patient_id, num_medications, num_lab_procedures, number_inpatient, time_in_hospital
+            INSERT INTO dim_visit_metrics (
+                visit_id, time_in_hospital, num_lab_procedures, num_procedures, 
+                num_medications, total_visits, number_inpatient, number_outpatient, 
+                number_emergency, diag_1_category, insulin, diabetes_med, a1c_result
+            )
+            SELECT 
+                visit_id, time_in_hospital, num_lab_procedures, num_procedures, 
+                num_medications, total_visits, number_inpatient, number_outpatient, 
+                number_emergency, diag_1_category, insulin, diabetes_med, a1c_result
             FROM silver_patient_visits
         """)
         dim_v = con.execute("SELECT COUNT(*) FROM dim_visit_metrics").fetchone()[0]
@@ -284,7 +301,7 @@ def populate_fact_from_silver():
 
     con = get_connection()
     try:
-        silver_df = con.execute("SELECT patient_id, time_in_hospital FROM silver_patient_visits").fetchdf()
+        silver_df = con.execute("SELECT patient_id, visit_id, readmitted_binary FROM silver_patient_visits").fetchdf()
 
         # Try to get existing predictions
         try:
@@ -310,10 +327,11 @@ def populate_fact_from_silver():
         from datetime import datetime
         fact_df = pd.DataFrame({
             'patient_id': merged['patient_id'],
-            'visit_id': merged['patient_id'],  # 1:1 for now
+            'visit_id': merged['visit_id'],
             'timestamp': datetime.now().isoformat(),
             'risk_score': merged['risk_score'],
             'risk_level': merged['risk_level'],
+            'readmitted_binary': merged['readmitted_binary'],
         })
 
         con.execute("DELETE FROM fact_patient_visits")
@@ -371,15 +389,17 @@ def refresh_gold_from_fact():
         con.execute("""
             INSERT INTO gold_patient_risk_summary
                 (patient_id, age, age_group, gender, race, diag_1_category,
-                 num_medications, time_in_hospital, total_visits, number_inpatient,
+                 num_medications, num_lab_procedures, time_in_hospital, 
+                 total_visits, number_inpatient, insulin, diabetes_med, a1c_result,
                  risk_score, risk_percentage, risk_level)
             SELECT
-                s.patient_id, s.age_numeric, s.age_group, s.gender, s.race,
-                s.diag_1_category, s.num_medications, s.time_in_hospital,
-                s.total_visits, s.number_inpatient,
+                p.patient_id, p.age, p.age_group, p.gender, p.race,
+                v.diag_1_category, v.num_medications, v.num_lab_procedures, v.time_in_hospital,
+                v.total_visits, v.number_inpatient, v.insulin, v.diabetes_med, v.a1c_result,
                 f.risk_score, ROUND(f.risk_score * 100, 1), f.risk_level
             FROM fact_patient_visits f
-            JOIN silver_patient_visits s ON f.patient_id = s.patient_id
+            JOIN dim_patient p ON f.patient_id = p.patient_id
+            JOIN dim_visit_metrics v ON f.visit_id = v.visit_id
         """)
 
         kpi_row = con.execute("SELECT * FROM gold_hospital_kpis").fetchone()

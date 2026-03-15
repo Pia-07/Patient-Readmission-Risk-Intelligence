@@ -71,13 +71,16 @@ def _build_patient_risk_summary(silver_df: pd.DataFrame, predictions_df: pd.Data
         logger.info(f"  Generating risk scores for {missing_mask.sum()} unmatched patients...")
         np.random.seed(42)
         n_missing = int(missing_mask.sum())
-        ages = merged.loc[missing_mask, 'age_numeric'].values
+        
+        # Simple numeric proxy for age_group
+        age_map = {'0-20': 1, '21-40': 2, '41-60': 3, '61-80': 4, '81-100': 5}
+        age_proxy = merged.loc[missing_mask, 'age_group'].map(age_map).fillna(3).values
         inpatient = merged.loc[missing_mask, 'number_inpatient'].values
         meds = merged.loc[missing_mask, 'num_medications'].values
 
         # Clinically realistic formula
         risk_scores = np.clip(
-            0.1 + ages / 200 + inpatient * 0.08 + meds / 100 + np.random.normal(0, 0.12, n_missing),
+            0.1 + age_proxy / 10 + inpatient * 0.08 + meds / 100 + np.random.normal(0, 0.12, n_missing),
             0.01, 0.99
         )
         risk_levels = pd.cut(risk_scores, bins=[0, 0.3, 0.6, 1.0], labels=['Low', 'Medium', 'High'])
@@ -88,15 +91,19 @@ def _build_patient_risk_summary(silver_df: pd.DataFrame, predictions_df: pd.Data
 
     gold_df = pd.DataFrame({
         'patient_id': merged['patient_id'],
-        'age': merged['age_numeric'],
+        'age': merged['age'],
         'age_group': merged['age_group'],
         'gender': merged['gender'],
         'race': merged['race'],
         'diag_1_category': merged['diag_1_category'],
         'num_medications': merged['num_medications'],
+        'num_lab_procedures': merged['num_lab_procedures'],
         'time_in_hospital': merged['time_in_hospital'],
         'total_visits': merged['total_visits'],
         'number_inpatient': merged['number_inpatient'],
+        'insulin': merged['insulin'],
+        'diabetes_med': merged['diabetes_med'],
+        'a1c_result': merged['a1c_result'],
         'risk_score': merged['risk_score'],
         'risk_percentage': merged['risk_percentage'],
         'risk_level': merged['risk_level'],

@@ -25,51 +25,36 @@ DB_URI = f"duckdb:///{DB_PATH}"
 SCHEMA_CONTEXT = """
 You have access to a DuckDB healthcare data warehouse with these tables:
 
-TABLE: patients
-Columns: patient_id (INT PK), age (INT), age_group (VARCHAR), gender (VARCHAR), race (VARCHAR),
-         num_medications (INT), num_lab_procedures (INT), num_procedures (INT),
-         number_diagnoses (INT), time_in_hospital (INT),
-         diag_1_category (VARCHAR), diag_2_category (VARCHAR), diag_3_category (VARCHAR),
-         diabetes_med (VARCHAR), insulin (VARCHAR), a1c_result (VARCHAR)
+TABLE: gold_patient_risk_summary
+Columns: patient_id (INT), age (INT), age_group (VARCHAR), gender (VARCHAR), race (VARCHAR),
+         diag_1_category (VARCHAR), num_medications (INT), num_lab_procedures (INT),
+         time_in_hospital (INT), total_visits (INT), number_inpatient (INT),
+         insulin (VARCHAR), diabetes_med (VARCHAR), a1c_result (VARCHAR),
+         risk_score (DOUBLE), risk_level (VARCHAR)
 
-TABLE: patient_visits
-Columns: visit_id (INT PK), patient_id (INT FK), admission_type_id (INT),
-         discharge_disposition_id (INT), admission_source_id (INT),
-         number_outpatient (INT), number_emergency (INT), number_inpatient (INT),
-         total_visits (INT), medication_change (BOOL), high_lab_procedures (BOOL)
+TABLE: gold_hospital_kpis
+Columns: total_patients (BIGINT), high_risk_patients (BIGINT), high_risk_rate (DOUBLE),
+         avg_risk_score (DOUBLE), avg_length_of_stay (DOUBLE), avg_medications (DOUBLE)
 
-TABLE: model_predictions
-Columns: prediction_id (INT PK), patient_id (INT FK), risk_score (DOUBLE),
-         risk_percentage (DOUBLE), risk_level (VARCHAR), actual_readmitted (INT),
-         top_factors (VARCHAR)
+TABLE: gold_risk_distribution
+Columns: risk_level (VARCHAR), patient_count (BIGINT), percentage (DOUBLE)
 
 TABLE: fact_patient_visits
 Columns: id (INT), patient_id (INT), visit_id (INT), timestamp (VARCHAR),
-         risk_score (DOUBLE), risk_level (VARCHAR)
+         risk_score (DOUBLE), risk_level (VARCHAR), readmitted_binary (INT)
 
 TABLE: dim_patient
-Columns: patient_id (INT PK), age (INT), gender (VARCHAR)
+Columns: patient_id (INT PK), age (INT), age_group (VARCHAR), gender (VARCHAR), race (VARCHAR)
 
 TABLE: dim_visit_metrics
-Columns: visit_id (INT PK), num_medications (INT), num_lab_procedures (INT),
-         number_inpatient (INT), time_in_hospital (INT)
-
-TABLE: gold_hospital_kpis
-Columns: total_patients (BIGINT), high_risk_patients (BIGINT), high_risk_percentage (DOUBLE),
-         avg_risk_score (DOUBLE), avg_time_in_hospital (DOUBLE)
-
-TABLE: gold_risk_distribution
-Columns: risk_level (VARCHAR), patient_count (BIGINT), avg_risk_score (DOUBLE)
-
-TABLE: gold_patient_risk_summary
-Columns: patient_id (INTEGER), age (INTEGER), gender (VARCHAR),
-         risk_score (DOUBLE), risk_level (VARCHAR), last_visit_timestamp (VARCHAR)
+Columns: visit_id (INT PK), time_in_hospital (INT), num_lab_procedures (INT), 
+         num_medications (INT), total_visits (INT), number_inpatient (INT),
+         diag_1_category (VARCHAR), insulin (VARCHAR), diabetes_med (VARCHAR), a1c_result (VARCHAR)
 
 IMPORTANT VALUES:
 - risk_level can be: 'Low', 'Medium', 'High'
 - gender can be: 'Male', 'Female'
-- age_group can be: '[0-10)', '[10-20)', '[20-30)', ... '[90-100)'
-- diag categories include: 'Circulatory', 'Respiratory', 'Digestive', 'Diabetes', 'Injury', 'Other'
+- diagnosis categories include: 'Circulatory', 'Respiratory', 'Digestive', 'Diabetes', 'Injury', 'Other'
 
 TIPS:
 - For general hospital stats or overview questions, query gold_hospital_kpis.
