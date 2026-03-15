@@ -164,6 +164,46 @@ async def get_stats():
     return {'total_patients': 0, 'high_risk_patients': 0, 'avg_risk_score': 0, 'avg_length_of_stay': 0, 'readmission_rate': 0}
 
 
+@app.post("/query", tags=["Analytics"])
+async def run_query(payload: dict):
+    """
+    Execute a read-only SELECT query against DuckDB.
+    Used by the AI chatbot to run LLM-generated SQL safely.
+    Only SELECT and WITH queries are permitted.
+    """
+    sql = payload.get("sql", "").strip()
+    if not sql:
+        raise HTTPException(status_code=400, detail="No SQL provided")
+
+    first_word = sql.split()[0].upper()
+    if first_word not in ("SELECT", "WITH"):
+        raise HTTPException(status_code=403, detail="Only SELECT queries are allowed")
+
+    for forbidden in ["insert ", "update ", "delete ", "drop ", "alter ", "create ", "truncate "]:
+        if forbidden in sql.lower():
+            raise HTTPException(status_code=403, detail=f"Destructive operation blocked: {forbidden.strip()}")
+
+    try:
+        import duckdb
+        parquet_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'parquet')
+        con = duckdb.connect(':memory:')
+        try:
+            # Register every Parquet file as a view — fully concurrent, no file locks
+            for fname in os.listdir(parquet_dir):
+                if fname.endswith('.parquet'):
+                    table = fname[:-len('.parquet')]
+                    fpath = os.path.join(parquet_dir, fname).replace('\\', '/')
+                    con.execute(f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{fpath}')")
+            df = con.execute(sql).fetchdf()
+            if len(df) > 100:
+                df = df.head(100)
+            return {"columns": df.columns.tolist(), "records": df.to_dict("records"), "row_count": len(df)}
+        finally:
+            con.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/patients/high-risk", tags=["Patients"])
 async def get_high_risk_patients():
     """

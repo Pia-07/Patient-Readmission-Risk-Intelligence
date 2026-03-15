@@ -7,11 +7,20 @@ env/
 venv/
 ENV/
 
-# Data and Models
+# Secrets — never commit API keys
+.env
+
+# Data and Models (large files / raw data)
 data/*.duckdb
 data/*.csv
 data/raw/*.csv
+data/raw/diabetic_data.csv
+data/raw/dataset_diabetes/*.csv
+data/raw/dataset_diabetes/*.pkl
+data/raw/dataset_diabetes/*.png
 data/processed/*.csv
+data/processed/*.pkl
+data/parquet/
 diabetic_data.csv
 models/*.pkl
 

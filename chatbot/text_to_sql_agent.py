@@ -3,19 +3,19 @@ Text-to-SQL Agent — Production Ready
 Uses Google Gemini Flash 2.5 to convert natural language → SQL → DuckDB → explanation.
 """
 
-from langchain_community.utilities import SQLDatabase
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains import create_sql_query_chain
+from dotenv import load_dotenv
 import os
 import re
 import logging
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ── Configuration ──────────────────────────────────────────────
-GEMINI_API_KEY = "AIzaSyBnhIQWWK45sfLWWQKUTmxFiM8AD9BfCC0"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MODEL_NAME = "gemini-2.5-flash"
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'kenexai.duckdb')
@@ -25,56 +25,67 @@ DB_URI = f"duckdb:///{DB_PATH}"
 SCHEMA_CONTEXT = """
 You have access to a DuckDB healthcare data warehouse with these tables:
 
-TABLE: patients
+TABLE: patients  (71,518 rows — operational master, use for patient-level queries)
 Columns: patient_id (INT PK), age (INT), age_group (VARCHAR), gender (VARCHAR), race (VARCHAR),
          num_medications (INT), num_lab_procedures (INT), num_procedures (INT),
          number_diagnoses (INT), time_in_hospital (INT),
          diag_1_category (VARCHAR), diag_2_category (VARCHAR), diag_3_category (VARCHAR),
          diabetes_med (VARCHAR), insulin (VARCHAR), a1c_result (VARCHAR)
 
-TABLE: patient_visits
-Columns: visit_id (INT PK), patient_id (INT FK), admission_type_id (INT),
+TABLE: patient_visits  (71,518 rows — FK to patients)
+Columns: visit_id (INT PK), patient_id (INT FK→patients), admission_type_id (INT),
          discharge_disposition_id (INT), admission_source_id (INT),
          number_outpatient (INT), number_emergency (INT), number_inpatient (INT),
          total_visits (INT), medication_change (BOOL), high_lab_procedures (BOOL)
 
-TABLE: model_predictions
-Columns: prediction_id (INT PK), patient_id (INT FK), risk_score (DOUBLE),
+TABLE: model_predictions  (71,518 rows — ML model output, FK to patients)
+Columns: prediction_id (INT PK), patient_id (INT FK→patients), risk_score (DOUBLE),
          risk_percentage (DOUBLE), risk_level (VARCHAR), actual_readmitted (INT),
-         top_factors (VARCHAR)
+         top_factors (VARCHAR), model_version (VARCHAR)
 
-TABLE: fact_patient_visits
-Columns: id (INT), patient_id (INT), visit_id (INT), timestamp (VARCHAR),
-         risk_score (DOUBLE), risk_level (VARCHAR)
+TABLE: gold_patient_risk_summary  (71,518 rows — best table for risk + demographics together)
+Columns: patient_id (INT PK), age (INT), age_group (VARCHAR), gender (VARCHAR), race (VARCHAR),
+         diag_1_category (VARCHAR), num_medications (INT), time_in_hospital (INT),
+         total_visits (INT), number_inpatient (INT),
+         risk_score (DOUBLE), risk_percentage (DOUBLE), risk_level (VARCHAR)
 
-TABLE: dim_patient
+TABLE: gold_hospital_kpis  (1 row — overall hospital statistics)
+Columns: total_patients (INT), high_risk_patients (INT), high_risk_rate (DOUBLE),
+         avg_risk_score (DOUBLE), avg_length_of_stay (DOUBLE), avg_medications (DOUBLE)
+
+TABLE: gold_risk_distribution  (3 rows — one per risk level)
+Columns: risk_level (VARCHAR), patient_count (INT), percentage (DOUBLE)
+
+TABLE: dim_patient  (71,518 rows — star schema dimension)
 Columns: patient_id (INT PK), age (INT), gender (VARCHAR)
 
-TABLE: dim_visit_metrics
+TABLE: dim_visit_metrics  (71,518 rows — star schema dimension)
 Columns: visit_id (INT PK), num_medications (INT), num_lab_procedures (INT),
          number_inpatient (INT), time_in_hospital (INT)
 
-TABLE: gold_hospital_kpis
-Columns: total_patients (BIGINT), high_risk_patients (BIGINT), high_risk_percentage (DOUBLE),
-         avg_risk_score (DOUBLE), avg_time_in_hospital (DOUBLE)
-
-TABLE: gold_risk_distribution
-Columns: risk_level (VARCHAR), patient_count (BIGINT), avg_risk_score (DOUBLE)
-
-TABLE: gold_patient_risk_summary
-Columns: patient_id (INTEGER), age (INTEGER), gender (VARCHAR),
-         risk_score (DOUBLE), risk_level (VARCHAR), last_visit_timestamp (VARCHAR)
+TABLE: fact_patient_visits  (71,518 rows — star schema fact)
+Columns: id (INT PK), patient_id (INT FK→dim_patient), visit_id (INT FK→dim_visit_metrics),
+         timestamp (VARCHAR), risk_score (DOUBLE), risk_level (VARCHAR)
 
 IMPORTANT VALUES:
-- risk_level can be: 'Low', 'Medium', 'High'
-- gender can be: 'Male', 'Female'
-- age_group can be: '[0-10)', '[10-20)', '[20-30)', ... '[90-100)'
-- diag categories include: 'Circulatory', 'Respiratory', 'Digestive', 'Diabetes', 'Injury', 'Other'
+- risk_level: 'Low', 'Medium', 'High'
+- gender: 'Male', 'Female', 'Unknown/Invalid'
+- age_group: '0-20', '21-40', '41-60', '61-80', '81-100'
+- race: 'Caucasian', 'AfricanAmerican', 'Hispanic', 'Asian', 'Other'
+- diag_1_category: 'Circulatory', 'Respiratory', 'Digestive', 'Diabetes',
+                   'Injury', 'Musculoskeletal', 'Genitourinary', 'Neoplasms',
+                   'External', 'Supplementary', 'Other'
+- diabetes_med: 'Yes', 'No'
+- insulin: 'No', 'Up', 'Down', 'Steady'
+- a1c_result: 'None', 'Norm', '>7', '>8'
+- high_risk_rate in gold_hospital_kpis is already a percentage (e.g. 12.5 means 12.5%)
 
 TIPS:
-- For general hospital stats or overview questions, query gold_hospital_kpis.
-- For patient risk lists or summaries, query gold_patient_risk_summary.
-- For count of patients by risk level, query gold_risk_distribution.
+- For a quick hospital overview, query gold_hospital_kpis (single row).
+- For risk + demographics together, use gold_patient_risk_summary.
+- For risk level breakdown (Low/Medium/High counts), use gold_risk_distribution.
+- For detailed patient info, JOIN patients with model_predictions on patient_id.
+- For visit details, JOIN patient_visits with patients on patient_id.
 """
 
 SQL_GENERATION_PROMPT = """You are a DuckDB SQL expert for a hospital readmission risk analytics platform.
@@ -157,30 +168,29 @@ def generate_sql(question: str) -> str:
     return _clean_sql(raw_sql)
 
 
-def execute_sql(query: str) -> tuple:
-    """Execute a SQL query against DuckDB. Returns (results_list, column_names)."""
-    import duckdb
+FASTAPI_URL = "http://localhost:8000"
 
-    # Double-check safety
+
+def execute_sql(query: str) -> tuple:
+    """Execute a SQL query via the FastAPI /query endpoint. Returns (records, columns)."""
+    import requests
+
     lower_q = query.lower().strip()
     for forbidden in ['insert ', 'update ', 'delete ', 'drop ', 'alter ', 'create ', 'truncate ']:
         if forbidden in lower_q:
             raise ValueError(f"Destructive SQL operation blocked: {forbidden.strip()}")
 
-    con = duckdb.connect(DB_PATH, read_only=True)
-    try:
-        result = con.execute(query)
-        df = result.fetchdf()
+    response = requests.post(
+        f"{FASTAPI_URL}/query",
+        json={"sql": query},
+        timeout=30
+    )
 
-        # Cap at 100 rows
-        if len(df) > 100:
-            df = df.head(100)
+    if response.status_code != 200:
+        raise ValueError(f"Query failed: {response.json().get('detail', response.text)}")
 
-        columns = df.columns.tolist()
-        records = df.to_dict('records')
-        return records, columns
-    finally:
-        con.close()
+    data = response.json()
+    return data["records"], data["columns"]
 
 
 def generate_explanation(question: str, sql: str, results: list) -> str:
